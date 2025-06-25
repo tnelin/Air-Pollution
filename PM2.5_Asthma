@@ -1,0 +1,120 @@
+table1_mc, vars(Asthma5 cat \ severity_phe cat \ mean_pm_ugm3 contn \ mean_pm_ugm3_tert cat \ ga_weeks contn \ extremepreterm cat \ birth_weight_grams contn \ elbw cat \ bpd cat \ dcg_age_days contn \ dcmed_cat cat \ dcg_support cat \  sex cat \ race_ethnicity cat \ edip_insur cat \ dep_index contn \ readm_flag cat \ birth_year cat \ birth_period cat \ race_ethnicity cat \ county cat) test
+
+summarize ga_weeks, detail
+summarize birth_weight_grams, detail
+
+table1_mc, by(Asthma5) vars(mean_pm_ugm3 contn \ mean_pm_ugm3_tert cat \ ga_weeks contn \ extremepreterm cat \ birth_weight_grams contn \ elbw cat \ bpd cat \ dcg_age_days contn \ dcmed_cat cat \ dcg_support cat \  sex cat \ race_ethnicity cat \ edip_insur cat \ dep_index contn \ severity_phe cat \ readm_flag cat \ birth_year cat \ birth_period cat \ race_ethnicity cat \ county cat) test
+
+histogram ga_weeks
+summarize ga_weeks if Asthma5 == 1, detail 
+summarize ga_weeks if Asthma5 == 0, detail
+
+histogram birth_weight_grams
+summarize birth_weight_grams if Asthma5 == 1, detail
+summarize birth_weight_grams if Asthma5 == 0, detail
+
+twoway (scatter mean_pm_ugm3 birth_year, jitter(2)), ///
+    xlabel(#10) ylabel(#10) title("Mean PM2.5 by Birth Year") ///
+    xtitle("Birth Year") ytitle("Mean PM2.5 (µg/m³)")
+	
+twoway (scatter mean_pm_ugm3 birth_period, jitter(2)), ///
+    xlabel(1 "2014 and before" 0 "2015 and after", noticks) ///
+    ylabel(#10) title("Mean PM2.5 by Birth Period") ///
+    xtitle("Birth Period") ytitle("Mean PM2.5 (µg/m³)") ///
+	xscale(reverse range(-0.5 1.5))
+	
+summarize mean_pm_ugm3 if birth_period == 1, detail
+summarize mean_pm_ugm3 if birth_period == 0, detail
+
+summarize dcg_age_days if readm_flag == 0, detail
+summarize dcg_age_days if readm_flag == 1, detail
+
+* Analysis 
+* Model 0
+logit Asthma5 mean_pm_ugm3, vce(robust) or
+
+* Model 1: Clinical
+logit Asthma5 mean_pm_ugm3 ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype, vce(robust) or
+
+* Model 2: Add Deprivation Index
+logit Asthma5 mean_pm_ugm3 ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index, vce(robust) or
+
+* Model 3: Add race/ethnicity
+logit Asthma5 mean_pm_ugm3 ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc, vce(robust) or
+estat gof
+margins, dydx(mean_pm_ugm3)
+
+melogit Asthma5 mean_pm_ugm3 ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc || county:, vce(robust) or
+
+melogit Asthma5 mean_pm_ugm3 ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc || GEOID:, vce(robust) or
+** Note lower AIC with fixed effects only model 
+
+* Model 4: Add readmission flag
+logit Asthma5 mean_pm_ugm3 ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc i.readm_flag, vce(robust) or
+estat gof
+estat ic
+
+melogit Asthma5 mean_pm_ugm3 ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc i.readm_flag || GEOID:, vce(robust) or
+estat ic
+** Note that lower AIC with fixed effects only model
+
+// Evaluate Dose Response by evaluating PM2.5 by tertiles
+
+* Evaluate "Dose Response"
+table1_mc, by(mean_pm_ugm3_tert) vars(Asthma5 cat \ mean_pm_ugm3 contn \ ga_weeks contn \ extremepreterm cat \ birth_weight_grams contn \ elbw cat \ bpd cat \ dcg_age_days contn \ dcmed_cat cat \ dcg_support cat \  sex cat \ race_ethnicity cat \ edip_insur cat \ dep_index contn \ severity_phe cat \ readm_flag cat \ birth_year cat \ birth_period cat \ race_ethnicity cat \ county cat) test
+
+summarize ga_weeks if mean_pm_ugm3_tert == 1, detail
+summarize ga_weeks if mean_pm_ugm3_tert == 2, detail
+summarize ga_weeks if mean_pm_ugm3_tert == 3, detail
+
+table1_mc, by(mean_pm_ugm3_tert) vars (mean_pm_ugm3 contn \ Asthma5 cat \ county cat) test
+
+* Model 0
+logit Asthma5 i.mean_pm_ugm3_tert, vce(robust) or
+margins i.mean_pm_ugm3_tert, pwcompare(effects)
+
+* Model 1: Clinical
+logit Asthma5 i.mean_pm_ugm3_tert ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support birth_period i.insurancetype, vce(robust) or
+margins i.mean_pm_ugm3_tert, pwcompare(effects)
+
+* Model 2: Add Deprivation Index
+logit Asthma5 i.mean_pm_ugm3_tert ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support birth_period i.insurancetype normalized_dep_index, vce(robust) or
+margins i.mean_pm_ugm3_tert, pwcompare(effects)
+
+* Model 3: Add Race/Ethnicity
+logit Asthma5 i.mean_pm_ugm3_tert ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc, vce(robust) or
+margins i.mean_pm_ugm3_tert, pwcompare(effects)
+marginsplot, noci ylabel(0(.1).7) ytitle("Predicted Probability of Asthma")
+lroc
+
+* Model 4: Add readmission flag
+logit Asthma5 i.mean_pm_ugm3_tert i.readm_flag ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc, vce(robust) or
+
+* Model 5: Effect modification of PM2.5 by readmission flag
+logit Asthma5 i.mean_pm_ugm3_tert##i.readm_flag ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc, vce(robust) or
+** no effect modificaiton, will proceed to mediation
+
+// Sensitivity Analysis: Restrict to Philadelphia County and observe directionality of association - view from 10,000 feet to observe for referral bias potential 
+* Model 0
+logit Asthma5 mean_pm_ugm3 if county == "PHILADELPHIA", vce(robust) or
+
+* Model 1: Clinical
+logit Asthma5 mean_pm_ugm3 ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype if county == "PHILADELPHIA", vce(robust) or
+
+* Model 2: Add Deprivation Index
+logit Asthma5 mean_pm_ugm3 ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index if county == "PHILADELPHIA", vce(robust) or
+
+* Model 3: Add Race/Ethnicity
+logit Asthma5 mean_pm_ugm3 ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc if county == "PHILADELPHIA", vce(robust) or
+** Directionality on all 3 models is the same and point estimate is about the same too. Non-significant findings, maybe due to small sample size.
+
+* Tertile
+logit Asthma5 i.mean_pm_ugm3_tert ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc if county == "PHILADELPHIA", vce(robust) or
+margins i.mean_pm_ugm3_tert, pwcompare(effects)
+
+// Sensitivity Analysis (fully adjusted) for all other counties excluding Philadelphia 
+logit Asthma5 mean_pm_ugm3 ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc if county != "PHILADELPHIA", vce(robust) or
+
+logit Asthma5 i.mean_pm_ugm3_tert ga_weeks birth_weight_grams i.sex_enc i.bpd dcg_age_days i.dcg_med i.any_dcg_support i.birth_period i.insurancetype normalized_dep_index i.race_ethnicity_enc if county != "PHILADELPHIA", vce(robust) or
+margins i.mean_pm_ugm3_tert
+** Still see point estimate in the same direction, non-significant finding
